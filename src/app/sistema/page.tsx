@@ -169,7 +169,8 @@ export default async function SistemaPage() {
           <CardHeader>
             <CardTitle>Tráfego de entrada</CardTitle>
             <CardDescription>
-              Últimos {SERIES_MINUTES} minutos, em bits por segundo (média por minuto)
+              Últimos {SERIES_MINUTES} minutos, em bits por segundo (média por minuto). Soma
+              apenas o tráfego relevante gravado pelo coletor, não o total do link.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-foreground">
