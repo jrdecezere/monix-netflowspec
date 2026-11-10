@@ -1,0 +1,11 @@
+! Taxa de amostragem por exportador, usada quando o roteador NÃO informa a taxa
+! no próprio export (confira com `docker logs sosisp-nfacctd` e comparando com
+! o contador de interface). Se o exportador não estiver listado aqui, vale a
+! taxa anunciada pelo roteador.
+!
+! Formato:  id=<N de 1:N>  ip=<IP de origem do export>
+! Exemplo:
+!   id=1000 ip=192.0.2.1
+!   id=1000 ip=192.0.2.2
+!
+! Depois de editar:  docker kill -s USR2 sosisp-nfacctd

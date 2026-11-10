@@ -1,0 +1,80 @@
+# PRODUCAO (Dokploy ou Docker em Debian): app + MySQL + coletor NetFlow.
+#
+#   cp .env.example .env   # preencha as senhas
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# No Dokploy: crie um servico "Compose", aponte para este arquivo, preencha as
+# variaveis na aba Environment e adicione o dominio ao servico "app" (porta 3000).
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?defina MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-sosisp}
+      MYSQL_USER: ${MYSQL_USER:-sosisp}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?defina MYSQL_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    # O banco NAO e publicado no host: so os outros containers o alcancam.
+
+  # Tarefa unica: aplica as migracoes e garante o administrador inicial.
+  migrate:
+    build:
+      context: .
+      target: migrate
+    restart: "no"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: mysql://${MYSQL_USER:-sosisp}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE:-sosisp}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_NAME: ${ADMIN_NAME:-Administrador}
+
+  app:
+    build:
+      context: .
+      target: runner
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: mysql://${MYSQL_USER:-sosisp}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE:-sosisp}
+      SESSION_SECRET: ${SESSION_SECRET:?defina SESSION_SECRET}
+      # true (padrao) exige HTTPS para o login funcionar; use false so para testar por HTTP.
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
+    ports:
+      # Acesso local/proxy reverso no host. Para expor direto: APP_BIND=0.0.0.0
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"
+
+  # Coletor NetFlow/IPFIX: os roteadores exportam para <IP do servidor>:2055/udp.
+  # Libere a porta so para os IPs dos roteadores (ufw/iptables).
+  nfacctd:
+    image: pmacct/nfacctd:latest
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      SQL_HOST: mysql
+      SQL_DB: ${MYSQL_DATABASE:-sosisp}
+      SQL_USER: ${MYSQL_USER:-sosisp}
+      SQL_PASSWD: ${MYSQL_PASSWORD}
+    entrypoint: ["sh", "/entrypoint.sh"]
+    ports:
+      - "${NETFLOW_PORT:-2055}:2055/udp"
+    volumes:
+      - ./pmacct/entrypoint.sh:/entrypoint.sh:ro
+      - ./pmacct/nfacctd.conf:/etc/pmacct/nfacctd.conf:ro
+      - ./pmacct/sampling.map:/etc/pmacct/sampling.map:ro
+
+volumes:
+  mysql-data:

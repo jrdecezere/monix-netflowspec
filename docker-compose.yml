@@ -1,0 +1,47 @@
+# DESENVOLVIMENTO: sobe so o MySQL e o coletor; o app roda com `npm run dev`.
+# Para producao (app + banco + coletor) use docker-compose.prod.yml.
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: sosisp-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: sosisp_root
+      MYSQL_DATABASE: sosisp
+      MYSQL_USER: sosisp
+      MYSQL_PASSWORD: sosisp123
+    ports:
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - sosisp-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-psosisp_root"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Coletor NetFlow/IPFIX: recebe dos roteadores, agrega e grava no MySQL.
+  nfacctd:
+    image: pmacct/nfacctd:latest
+    container_name: sosisp-nfacctd
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SQL_HOST: mysql
+      SQL_DB: sosisp
+      SQL_USER: sosisp
+      SQL_PASSWD: sosisp123
+    entrypoint: ["sh", "/entrypoint.sh"]
+    ports:
+      # Os roteadores Huawei exportam para <IP deste servidor>:2055/udp
+      - "2055:2055/udp"
+    volumes:
+      - ./pmacct/entrypoint.sh:/entrypoint.sh:ro
+      - ./pmacct/nfacctd.conf:/etc/pmacct/nfacctd.conf:ro
+      - ./pmacct/sampling.map:/etc/pmacct/sampling.map:ro
+
+volumes:
+  sosisp-mysql-data:
+    external: true

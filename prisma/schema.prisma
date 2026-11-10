@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum Role {
+  ADMIN
+  USER
+  GUEST
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String   @db.VarChar(120)
+  email        String   @unique @db.VarChar(190)
+  passwordHash String   @db.VarChar(100)
+  role         Role     @default(GUEST)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// Tabelas escritas pelo pmacct (nfacctd). Os nomes das colunas seguem as
+// convenções do plugin SQL (ip_dst, iface_in, peer_ip_src...), por isso ficam
+// aqui só para o Prisma não tentar removê-las; o app apenas LÊ estes dados.
+// Cada linha é um "balde" de 1 minuto, já normalizado pela taxa de amostragem.
+// ---------------------------------------------------------------------------
+
+/// Tráfego agregado por exportador, interface de entrada, destino, protocolo e flags TCP.
+model FlowDst {
+  peerIpSrc     String    @map("peer_ip_src") @db.Char(45)
+  ifaceIn       Int       @map("iface_in") @db.UnsignedInt
+  ipDst         String    @map("ip_dst") @db.Char(45)
+  ipProto       String    @map("ip_proto") @db.Char(6)
+  tcpFlags      Int       @map("tcp_flags") @db.UnsignedInt
+  packets       Int       @db.UnsignedInt
+  bytes         BigInt    @db.UnsignedBigInt
+  flows         Int       @db.UnsignedInt
+  stampInserted DateTime  @map("stamp_inserted") @db.DateTime(0)
+  stampUpdated  DateTime? @map("stamp_updated") @db.DateTime(0)
+
+  @@id([peerIpSrc, ifaceIn, ipDst, ipProto, tcpFlags, stampInserted])
+  @@index([stampInserted])
+  @@index([ipDst, stampInserted])
+  @@map("flow_dst")
+}
+
+/// Tráfego agregado por protocolo e porta de ORIGEM (assinaturas de amplificação).
+model FlowSrcPort {
+  peerIpSrc     String    @map("peer_ip_src") @db.Char(45)
+  ifaceIn       Int       @map("iface_in") @db.UnsignedInt
+  ipProto       String    @map("ip_proto") @db.Char(6)
+  portSrc       Int       @map("port_src") @db.UnsignedInt
+  packets       Int       @db.UnsignedInt
+  bytes         BigInt    @db.UnsignedBigInt
+  flows         Int       @db.UnsignedInt
+  stampInserted DateTime  @map("stamp_inserted") @db.DateTime(0)
+  stampUpdated  DateTime? @map("stamp_updated") @db.DateTime(0)
+
+  @@id([peerIpSrc, ifaceIn, ipProto, portSrc, stampInserted])
+  @@index([stampInserted])
+  @@map("flow_src_port")
+}
+
+model Setting {
+  key       String   @id @db.VarChar(64)
+  value     String   @db.VarChar(255)
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}
