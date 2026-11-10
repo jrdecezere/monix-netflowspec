@@ -143,14 +143,17 @@ export async function getExporters(): Promise<ExporterRow[]> {
 }
 
 export async function getTrafficOverview() {
-  const [series, destinations, srcPorts, interfaces, exporters] =
-    await Promise.all([
-      getSeries(),
-      getTopDestinations(),
-      getTopSrcPorts(),
-      getInterfaces(),
-      getExporters(),
-    ]);
+  // No máximo 2 consultas simultâneas: evita esgotar o pool de conexões quando
+  // o banco está lento ou há vários usuários com a tela aberta.
+  const [series, destinations] = await Promise.all([
+    getSeries(),
+    getTopDestinations(),
+  ]);
+  const [srcPorts, interfaces] = await Promise.all([
+    getTopSrcPorts(),
+    getInterfaces(),
+  ]);
+  const exporters = await getExporters();
 
   // Totais "agora" = soma das interfaces na janela recente
   const totalBps = interfaces.reduce((s, i) => s + i.bps, 0);
