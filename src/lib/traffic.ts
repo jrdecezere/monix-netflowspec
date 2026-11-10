@@ -31,19 +31,21 @@ export type ExporterRow = { exporter: string; lastSeenSeconds: number };
 
 const num = (v: unknown) => Number(v ?? 0);
 
+// Série do gráfico: vem de traffic_minute (um registro por minuto, gravado pelo
+// detector). Somar flow_dst direto custa minutos quando a tabela é grande.
+// O minuto corrente ainda está sendo preenchido e fica de fora. Se o detector
+// estiver desligado ou recém-instalado, o gráfico enche aos poucos.
 export async function getSeries(): Promise<SeriesPoint[]> {
-  // O balde do minuto corrente ainda está sendo preenchido: fica de fora.
   const rows = await prisma.$queryRaw<
     { ts: unknown; bytes: unknown; packets: unknown }[]
   >`
-    SELECT UNIX_TIMESTAMP(stamp_inserted) AS ts,
-           CAST(SUM(bytes) AS DOUBLE) AS bytes,
-           CAST(SUM(packets) AS DOUBLE) AS packets
-      FROM flow_dst
-     WHERE stamp_inserted >= NOW() - INTERVAL ${SERIES_MINUTES} MINUTE
-       AND stamp_inserted < DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:00')
-     GROUP BY stamp_inserted
-     ORDER BY stamp_inserted`;
+    SELECT UNIX_TIMESTAMP(stamp) AS ts,
+           CAST(bytes AS DOUBLE) AS bytes,
+           CAST(packets AS DOUBLE) AS packets
+      FROM traffic_minute
+     WHERE stamp >= NOW() - INTERVAL ${SERIES_MINUTES} MINUTE
+       AND stamp < DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:00')
+     ORDER BY stamp`;
   return rows.map((r) => ({
     ts: num(r.ts),
     bps: (num(r.bytes) * 8) / 60,
@@ -133,7 +135,7 @@ export async function getExporters(): Promise<ExporterRow[]> {
     SELECT peer_ip_src,
            TIMESTAMPDIFF(SECOND, MAX(stamp_updated), NOW()) AS age
       FROM flow_dst
-     WHERE stamp_inserted >= NOW() - INTERVAL 1 DAY
+     WHERE stamp_inserted >= NOW() - INTERVAL 5 MINUTE
      GROUP BY peer_ip_src
      ORDER BY peer_ip_src`;
   return rows.map((r) => ({
@@ -142,7 +144,7 @@ export async function getExporters(): Promise<ExporterRow[]> {
   }));
 }
 
-export async function getTrafficOverview() {
+async function loadTrafficOverview() {
   // No máximo 2 consultas simultâneas: evita esgotar o pool de conexões quando
   // o banco está lento ou há vários usuários com a tela aberta.
   const [series, destinations] = await Promise.all([
@@ -169,4 +171,24 @@ export async function getTrafficOverview() {
     totalBps,
     totalPps,
   };
+}
+
+// Várias pessoas (e o auto-atualizar de 15 s) pedem a mesma tela: calculamos uma
+// vez a cada 10 s e todos reaproveitam, em vez de multiplicar consultas pesadas.
+const OVERVIEW_TTL_MS = 10_000;
+type Overview = Awaited<ReturnType<typeof loadTrafficOverview>>;
+let overview: { at: number; value: Overview } | null = null;
+let overviewInflight: Promise<Overview> | null = null;
+
+export async function getTrafficOverview(): Promise<Overview> {
+  if (overview && Date.now() - overview.at < OVERVIEW_TTL_MS) return overview.value;
+  overviewInflight ??= loadTrafficOverview()
+    .then((value) => {
+      overview = { at: Date.now(), value };
+      return value;
+    })
+    .finally(() => {
+      overviewInflight = null;
+    });
+  return overviewInflight;
 }

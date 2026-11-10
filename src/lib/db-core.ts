@@ -24,6 +24,9 @@ function createClient() {
     // Espera por conexão livre (ms) antes de falhar; o padrão (10 s) é curto
     // para um banco ocupado gravando fluxos.
     acquireTimeout: 30_000,
+    // Consulta (SELECT) que passar de 20 s é abortada pelo MySQL e libera a
+    // conexão, em vez de travar o pool inteiro. Só vale para leituras.
+    sessionVariables: { max_execution_time: 20_000 },
   });
   return new PrismaClient({ adapter });
 }

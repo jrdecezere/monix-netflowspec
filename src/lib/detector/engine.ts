@@ -24,7 +24,7 @@ import {
 import { RateTracker, type RowSample } from "./tracker";
 
 /** Janela lida da tabela a cada ciclo (menor que o tempo de memória do tracker). */
-const QUERY_MINUTES = 4;
+const QUERY_MINUTES = 3;
 const HISTORY_KEEP_SECONDS = 15 * 60;
 
 type PrefixEntry = {
@@ -62,9 +62,16 @@ export class DetectorEngine {
     const summary: TickSummary = { at: nowSec, tracked: 0, opened: 0, closed: 0, open: 0 };
 
     await writeHeartbeat(nowSec);
+
+    const t0 = Date.now();
+    const rows = await this.readRows();
+    const readMs = Date.now() - t0;
+    if (readMs > 3000) {
+      this.log(`leitura lenta: ${readMs} ms para ${rows.length} linhas (MySQL sobrecarregado?)`);
+    }
+    await this.saveMinuteTotals(rows);
     if (!detect.enabled) return summary;
 
-    const rows = await this.readRows();
     this.tracker.ingest(rows, nowSec);
     this.tracker.prune(nowSec, HISTORY_KEEP_SECONDS);
 
@@ -189,6 +196,27 @@ export class DetectorEngine {
       });
     }
     if (res.error) this.log(`falha no alerta (${ip}): ${res.error}`);
+  }
+
+  /**
+   * Grava o total de cada minuto (todos os destinos) em traffic_minute, que é
+   * o que o gráfico do painel lê. O balde corrente é regravado a cada ciclo (a
+   * consulta traz o balde inteiro) e fica com o total final no último ciclo.
+   */
+  private async saveMinuteTotals(rows: RowSample[]) {
+    const totals = new Map<number, { bytes: number; packets: number }>();
+    for (const r of rows) {
+      const t = totals.get(r.stamp) ?? { bytes: 0, packets: 0 };
+      t.bytes += r.bytes;
+      t.packets += r.packets;
+      totals.set(r.stamp, t);
+    }
+    for (const [stamp, t] of totals) {
+      await prisma.$executeRaw`
+        INSERT INTO traffic_minute (stamp, bytes, packets)
+        VALUES (FROM_UNIXTIME(${stamp}), ${Math.round(t.bytes)}, ${Math.round(t.packets)})
+        ON DUPLICATE KEY UPDATE bytes = VALUES(bytes), packets = VALUES(packets)`;
+    }
   }
 
   private async readRows(): Promise<RowSample[]> {

@@ -96,6 +96,17 @@ model FlowDst {
 }
 
 /// Tráfego agregado por protocolo e porta de ORIGEM (assinaturas de amplificação).
+/// Totais por minuto (todas as interfaces), gravados pelo detector a partir das
+/// linhas que ele já lê. O gráfico do painel usa esta tabela: somar 60 min de
+/// flow_dst custa minutos em bancos grandes.
+model TrafficMinute {
+  stamp   DateTime @id @db.DateTime(0)
+  bytes   BigInt   @db.UnsignedBigInt
+  packets BigInt   @db.UnsignedBigInt
+
+  @@map("traffic_minute")
+}
+
 model FlowSrcPort {
   peerIpSrc     String    @map("peer_ip_src") @db.Char(45)
   ifaceIn       Int       @map("iface_in") @db.UnsignedInt
