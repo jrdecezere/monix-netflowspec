@@ -1,4 +1,5 @@
-import { Activity, Gauge, Lock, Network, Radio, Server } from "lucide-react";
+import Link from "next/link";
+import { Activity, Gauge, Lock, Network, Radio, Server, ShieldAlert } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { TrafficChart } from "@/components/traffic-chart";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { requireAccess } from "@/lib/dal";
+import { prisma } from "@/lib/db";
+import { SYSTEM_NAV } from "@/lib/nav";
 import {
   formatBps,
   formatNumber,
@@ -61,16 +64,39 @@ function Kpi({
 export default async function SistemaPage() {
   const user = await requireAccess("/sistema");
   const canEdit = user.role === "USER";
-  const data = await getTrafficOverview();
+  const [data, openAttacks] = await Promise.all([
+    getTrafficOverview(),
+    prisma.attackEvent.count({ where: { status: "OPEN" } }),
+  ]);
   const hasData = data.exporters.length > 0;
   const activeExporters = data.exporters.filter((e) => e.lastSeenSeconds < 120);
   const top = data.destinations[0];
 
   return (
     <div className="min-h-screen bg-white">
-      <AppHeader user={user} section="Monitoramento de tráfego" />
+      <AppHeader
+        user={user}
+        section="Monitoramento de tráfego"
+        nav={SYSTEM_NAV}
+        current="/sistema"
+      />
 
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
+        {openAttacks > 0 && (
+          <Link
+            href="/sistema/eventos"
+            role="alert"
+            className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 hover:bg-red-100"
+          >
+            <ShieldAlert className="size-4 shrink-0" />
+            <span>
+              <strong>{openAttacks}</strong>{" "}
+              {openAttacks === 1 ? "possível ataque em andamento" : "possíveis ataques em andamento"}
+              . Ver detalhes
+            </span>
+          </Link>
+        )}
+
         {!canEdit && (
           <div
             role="status"

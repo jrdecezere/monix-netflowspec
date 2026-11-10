@@ -80,6 +80,25 @@ Configuração do roteador e validação com equipamento real: [docs/fase-0-huaw
 O modelo do coletor é `pmacct/nfacctd.conf` (UTF-8 **sem BOM**, senão o pmacct não inicia).
 Para testar sem roteador: `node tools/netflow-gen.mjs --seconds 120 --attack ntp` (`ntp | dns | memcached | syn`).
 
+## Detecção de ataques (Fase 2: só alerta)
+
+O detector roda **dentro do próprio painel** (`src/instrumentation.ts`, sobe junto com o servidor Next) e **não altera
+nada no roteador**. A cada ciclo (padrão 10 s) ele lê os contadores do pmacct, calcula a taxa dos últimos 60 s por IP
+de destino e compara com os limiares:
+
+- **Limiares globais** (banda, pacotes/s, SYN/s) em **Admin → Detecção**; cada prefixo cadastrado em **Admin → Prefixos**
+  pode ter limites próprios ou ficar na **lista de exceção** (nunca alerta). Vale o prefixo mais específico.
+- **Evita falso positivo:** o evento só abre após N ciclos seguidos acima do limiar e só encerra após M ciclos abaixo de
+  50% dele (histerese). SYN só conta se for a maioria do TCP.
+- **Classificação** pelo perfil do tráfego: SYN flood, amplificação UDP (NTP, DNS, Memcached…), UDP flood, ICMP flood ou
+  volumétrico. É heurística para orientar a análise, não prova.
+- **Alertas** por Telegram (bot) e/ou webhook JSON, ao abrir e ao encerrar o ataque; botão "Enviar teste" na página.
+- Eventos em **Sistema → Ataques** (e aviso na tela de tráfego quando há ataque em andamento).
+
+Sem prefixos cadastrados valem só os limiares globais para todos os destinos. Escopo "só prefixos cadastrados" ignora o resto.
+Para rodar o detector em outro processo/container: `DETECTOR_IN_PROCESS=false` no painel e `npm run detector` no outro.
+Testes unitários: `npm test`.
+
 ## Desenvolvimento
 
 ```bash
@@ -101,6 +120,7 @@ Contas de demonstração (só com `SEED_DEMO=true`; nunca em produção):
 - `src/lib/dal.ts` — verificação definitiva no servidor (relê o usuário no banco: excluído/inativo perde acesso na hora). Use `requireAccess` nas páginas e `requireRole` nas Server Actions.
 - `src/lib/roles.ts` — mapa de níveis → rotas permitidas.
 - `src/lib/traffic.ts` — consultas das tabelas de fluxo.
-- `src/app/admin` — gestão de usuários (criar, editar, excluir) e tema.
-- `src/app/sistema` — painel de tráfego (Usuário/Convidado). Para ações de escrita, valide com `requireRole("USER")`.
+- `src/lib/detector/` — detector: `tracker` (taxas a partir dos contadores do pmacct), `rules` (limiares, classificação, histerese), `engine` (ciclo e eventos), `alerts` (Telegram/webhook).
+- `src/app/admin` — gestão de usuários (criar, editar, excluir), tema, detecção (`/admin/deteccao`) e prefixos (`/admin/prefixos`).
+- `src/app/sistema` — painel de tráfego e ataques (Usuário/Convidado). Para ações de escrita, valide com `requireRole("USER")`.
 - `pmacct/` — configuração do coletor. `Dockerfile` e `docker-compose*.yml` — deploy.

@@ -1,0 +1,12 @@
+export type NavItem = { href: string; label: string };
+
+export const ADMIN_NAV: NavItem[] = [
+  { href: "/admin", label: "Usuários" },
+  { href: "/admin/deteccao", label: "Detecção" },
+  { href: "/admin/prefixos", label: "Prefixos" },
+];
+
+export const SYSTEM_NAV: NavItem[] = [
+  { href: "/sistema", label: "Tráfego" },
+  { href: "/sistema/eventos", label: "Ataques" },
+];

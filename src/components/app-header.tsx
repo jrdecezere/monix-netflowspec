@@ -1,15 +1,22 @@
+import Link from "next/link";
 import { LogOut, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { logout } from "@/app/login/actions";
+import type { NavItem } from "@/lib/nav";
 import { ROLE_LABEL, type RoleName } from "@/lib/roles";
 
 export function AppHeader({
   user,
   section,
+  nav,
+  current,
 }: {
   user: { name: string; email: string; role: RoleName };
   section: string;
+  nav?: NavItem[];
+  /** href do item de navegação ativo */
+  current?: string;
 }) {
   return (
     <header className="bg-primary text-primary-foreground shadow-sm">
@@ -45,6 +52,31 @@ export function AppHeader({
           </form>
         </div>
       </div>
+
+      {nav && nav.length > 0 && (
+        <nav
+          aria-label="Seções"
+          className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 sm:px-6"
+        >
+          {nav.map((item) => {
+            const active = item.href === current;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm transition ${
+                  active
+                    ? "border-white font-medium text-white"
+                    : "border-transparent text-white/75 hover:text-white"
+                }`}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+      )}
     </header>
   );
 }

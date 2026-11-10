@@ -10,6 +10,8 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "tsx --test \"src/**/*.test.ts\"",
+    "detector": "tsx scripts/detector.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "prisma db seed"

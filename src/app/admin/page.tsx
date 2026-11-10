@@ -1,6 +1,7 @@
 import { AppHeader } from "@/components/app-header";
 import { requireAccess } from "@/lib/dal";
 import { prisma } from "@/lib/db";
+import { ADMIN_NAV } from "@/lib/nav";
 import { getThemeColor } from "@/lib/settings";
 import { ThemeColorForm } from "./theme-color-form";
 import { UsersManager, type UserRow } from "./users-manager";
@@ -32,7 +33,7 @@ export default async function AdminPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <AppHeader user={me} section="Administração" />
+      <AppHeader user={me} section="Administração" nav={ADMIN_NAV} current="/admin" />
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         <ThemeColorForm current={themeColor} />
         <UsersManager users={rows} currentUserId={me.id} />

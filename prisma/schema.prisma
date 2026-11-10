@@ -26,6 +26,49 @@ model User {
   @@map("users")
 }
 
+/// Prefixos de clientes (IPv4/CIDR). Servem para dar nome ao alvo de um ataque,
+/// definir limiares próprios e marcar exceções (ignore = nunca alertar).
+model Prefix {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(120)
+  cidr        String   @unique @db.VarChar(18)
+  ignore      Boolean  @default(false)
+  /// Limiares próprios (vazio = usa o padrão global). bps, pps e SYN pps.
+  bpsLimit    Float?
+  ppsLimit    Float?
+  synPpsLimit Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("prefixes")
+}
+
+enum AttackStatus {
+  OPEN
+  CLOSED
+}
+
+/// Ataque detectado contra um IP de destino (um registro por ocorrência).
+model AttackEvent {
+  id         Int          @id @default(autoincrement())
+  targetIp   String       @db.VarChar(45)
+  prefixName String?      @db.VarChar(120)
+  type       String       @db.VarChar(32)
+  status     AttackStatus @default(OPEN)
+  startedAt  DateTime     @default(now())
+  lastSeenAt DateTime     @default(now())
+  endedAt    DateTime?
+  peakBps    Float        @default(0)
+  peakPps    Float        @default(0)
+  evidence   Json?
+  alertedAt  DateTime?
+  alertError String?      @db.VarChar(255)
+
+  @@index([status, startedAt])
+  @@index([targetIp, startedAt])
+  @@map("attack_events")
+}
+
 // ---------------------------------------------------------------------------
 // Tabelas escritas pelo pmacct (nfacctd). Os nomes das colunas seguem as
 // convenções do plugin SQL (ip_dst, iface_in, peer_ip_src...), por isso ficam
@@ -53,6 +96,25 @@ model FlowDst {
 }
 
 /// Tráfego agregado por protocolo e porta de ORIGEM (assinaturas de amplificação).
+/// Fluxos "só SYN" (tcp_flags == 0x02), isolados pelo pre_tag_map do pmacct.
+/// Em `flow_dst` o tcp_flags é um OR acumulado do minuto (SYN+ACK mascara o SYN),
+/// então esta tabela é a fonte confiável para detectar SYN flood.
+model FlowSyn {
+  peerIpSrc     String    @map("peer_ip_src") @db.Char(45)
+  ifaceIn       Int       @map("iface_in") @db.UnsignedInt
+  ipDst         String    @map("ip_dst") @db.Char(45)
+  packets       Int       @db.UnsignedInt
+  bytes         BigInt    @db.UnsignedBigInt
+  flows         Int       @db.UnsignedInt
+  stampInserted DateTime  @map("stamp_inserted") @db.DateTime(0)
+  stampUpdated  DateTime? @map("stamp_updated") @db.DateTime(0)
+
+  @@id([peerIpSrc, ifaceIn, ipDst, stampInserted])
+  @@index([stampInserted])
+  @@index([ipDst, stampInserted])
+  @@map("flow_syn")
+}
+
 model FlowSrcPort {
   peerIpSrc     String    @map("peer_ip_src") @db.Char(45)
   ifaceIn       Int       @map("iface_in") @db.UnsignedInt
