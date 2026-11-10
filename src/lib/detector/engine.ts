@@ -21,10 +21,9 @@ import {
   type Rates,
   type SrcPortHint,
 } from "./rules";
+import { readRecentRows } from "./read-rows";
 import { RateTracker, type RowSample } from "./tracker";
 
-/** Janela lida da tabela a cada ciclo (menor que o tempo de memória do tracker). */
-const QUERY_MINUTES = 3;
 const HISTORY_KEEP_SECONDS = 15 * 60;
 
 type PrefixEntry = {
@@ -64,7 +63,7 @@ export class DetectorEngine {
     await writeHeartbeat(nowSec);
 
     const t0 = Date.now();
-    const rows = await this.readRows();
+    const rows = await readRecentRows();
     const readMs = Date.now() - t0;
     if (readMs > 3000) {
       this.log(`leitura lenta: ${readMs} ms para ${rows.length} linhas (MySQL sobrecarregado?)`);
@@ -217,46 +216,6 @@ export class DetectorEngine {
         VALUES (FROM_UNIXTIME(${stamp}), ${Math.round(t.bytes)}, ${Math.round(t.packets)})
         ON DUPLICATE KEY UPDATE bytes = VALUES(bytes), packets = VALUES(packets)`;
     }
-  }
-
-  private async readRows(): Promise<RowSample[]> {
-    const rows = await prisma.$queryRaw<
-      {
-        ip_dst: string;
-        stamp: unknown;
-        bytes: unknown;
-        packets: unknown;
-        flows: unknown;
-        udp_bytes: unknown;
-        tcp_packets: unknown;
-        syn_packets: unknown;
-        icmp_packets: unknown;
-      }[]
-    >`
-      SELECT ip_dst,
-             UNIX_TIMESTAMP(stamp_inserted) AS stamp,
-             CAST(SUM(bytes) AS DOUBLE) AS bytes,
-             CAST(SUM(packets) AS DOUBLE) AS packets,
-             CAST(SUM(flows) AS DOUBLE) AS flows,
-             CAST(SUM(CASE WHEN ip_proto = 'udp' THEN bytes ELSE 0 END) AS DOUBLE) AS udp_bytes,
-             CAST(SUM(CASE WHEN ip_proto = 'tcp' THEN packets ELSE 0 END) AS DOUBLE) AS tcp_packets,
-             CAST(SUM(CASE WHEN ip_proto = 'tcp' AND (tcp_flags & 2) > 0
-                           THEN packets ELSE 0 END) AS DOUBLE) AS syn_packets,
-             CAST(SUM(CASE WHEN ip_proto = 'icmp' THEN packets ELSE 0 END) AS DOUBLE) AS icmp_packets
-        FROM flow_dst
-       WHERE stamp_inserted >= NOW() - INTERVAL ${QUERY_MINUTES} MINUTE
-       GROUP BY ip_dst, stamp_inserted`;
-    return rows.map((r) => ({
-      ip: r.ip_dst.trim(),
-      stamp: n(r.stamp),
-      bytes: n(r.bytes),
-      packets: n(r.packets),
-      flows: n(r.flows),
-      udpBytes: n(r.udp_bytes),
-      tcpPackets: n(r.tcp_packets),
-      synPackets: n(r.syn_packets),
-      icmpPackets: n(r.icmp_packets),
-    }));
   }
 
   private async loadPrefixes(): Promise<PrefixEntry[]> {

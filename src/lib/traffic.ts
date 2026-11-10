@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "./db";
 
 /** Janela usada nas tabelas "top" e nos totais atuais. */
-export const RECENT_SECONDS = 180;
+export const RECENT_SECONDS = 120;
 /** Janela do gráfico, em minutos. */
 export const SERIES_MINUTES = 60;
 
@@ -30,6 +30,30 @@ export type InterfaceRow = {
 export type ExporterRow = { exporter: string; lastSeenSeconds: number };
 
 const num = (v: unknown) => Number(v ?? 0);
+
+/**
+ * Executa uma consulta e, se ela falhar (ex.: estourou o tempo máximo), devolve
+ * o valor vazio e anota um aviso em vez de derrubar a página inteira.
+ */
+async function guarded<T>(
+  name: string,
+  warnings: string[],
+  fallback: T,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const t0 = Date.now();
+  try {
+    const value = await fn();
+    const ms = Date.now() - t0;
+    if (ms > 3000) console.warn(`[traffic] consulta lenta: ${name} levou ${ms} ms`);
+    return value;
+  } catch (e) {
+    const ms = Date.now() - t0;
+    console.error(`[traffic] consulta falhou: ${name} (${ms} ms)`, e instanceof Error ? e.message : e);
+    warnings.push(name);
+    return fallback;
+  }
+}
 
 // Série do gráfico: vem de traffic_minute (um registro por minuto, gravado pelo
 // detector). Somar flow_dst direto custa minutos quando a tabela é grande.
@@ -145,17 +169,18 @@ export async function getExporters(): Promise<ExporterRow[]> {
 }
 
 async function loadTrafficOverview() {
+  const warnings: string[] = [];
   // No máximo 2 consultas simultâneas: evita esgotar o pool de conexões quando
   // o banco está lento ou há vários usuários com a tela aberta.
   const [series, destinations] = await Promise.all([
-    getSeries(),
-    getTopDestinations(),
+    guarded("gráfico", warnings, [] as SeriesPoint[], getSeries),
+    guarded("maiores destinos", warnings, [] as TopDestination[], () => getTopDestinations()),
   ]);
   const [srcPorts, interfaces] = await Promise.all([
-    getTopSrcPorts(),
-    getInterfaces(),
+    guarded("portas de origem", warnings, [] as TopSrcPort[], () => getTopSrcPorts()),
+    guarded("interfaces", warnings, [] as InterfaceRow[], getInterfaces),
   ]);
-  const exporters = await getExporters();
+  const exporters = await guarded("exportadores", warnings, [] as ExporterRow[], getExporters);
 
   // Totais "agora" = soma das interfaces na janela recente
   const totalBps = interfaces.reduce((s, i) => s + i.bps, 0);
@@ -170,6 +195,7 @@ async function loadTrafficOverview() {
     exporters,
     totalBps,
     totalPps,
+    warnings,
   };
 }
 

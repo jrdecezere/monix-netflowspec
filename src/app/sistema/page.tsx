@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, Gauge, Lock, Network, Radio, Server, ShieldAlert } from "lucide-react";
+import { Activity, AlertTriangle, Gauge, Lock, Network, Radio, Server, ShieldAlert } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { TrafficChart } from "@/components/traffic-chart";
 import { Badge } from "@/components/ui/badge";
@@ -95,6 +95,20 @@ export default async function SistemaPage() {
               . Ver detalhes
             </span>
           </Link>
+        )}
+
+        {data.warnings.length > 0 && (
+          <div
+            role="status"
+            className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          >
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+            <span>
+              O banco demorou demais para responder: <strong>{data.warnings.join(", ")}</strong>{" "}
+              não puderam ser carregados agora e aparecem vazios. A página tenta de novo
+              sozinha. Se persistir, veja Administração → Diagnóstico.
+            </span>
+          </div>
         )}
 
         {!canEdit && (
