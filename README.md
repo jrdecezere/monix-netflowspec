@@ -20,7 +20,8 @@ inicial são criados automaticamente na primeira subida.
 
 ```bash
 # 1. Docker (se ainda não tiver): https://docs.docker.com/engine/install/debian/
-git clone https://github.com/<usuario>/<repositorio>.git sosisp && cd sosisp
+# repositório privado: use um deploy key (SSH) ou um token de acesso (HTTPS)
+git clone git@github.com:jrdecezere/monix-netflowspec.git sosisp && cd sosisp
 
 # 2. Configuração
 cp .env.example .env
