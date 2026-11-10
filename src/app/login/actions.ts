@@ -63,7 +63,24 @@ export async function login(
     };
   }
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  if (!process.env.SESSION_SECRET) {
+    console.error("[login] SESSION_SECRET não está definido no ambiente");
+    return {
+      error: "Servidor mal configurado: defina SESSION_SECRET (veja /api/health).",
+      email,
+    };
+  }
+
+  let user;
+  try {
+    user = await prisma.user.findUnique({ where: { email } });
+  } catch (e) {
+    console.error("[login] falha ao consultar o banco:", e);
+    return {
+      error: "Não foi possível acessar o banco de dados (veja /api/health).",
+      email,
+    };
+  }
   const valid = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH);
 
   if (!user || !valid) {
