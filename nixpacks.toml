@@ -1,0 +1,7 @@
+# Usado quando o Dokploy cria o servico como "Application" com build Nixpacks.
+# (O jeito recomendado e o servico "Compose" com docker-compose.prod.yml.)
+#
+# Variaveis obrigatorias: DATABASE_URL, SESSION_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD.
+# Ao iniciar, aplica as migracoes do banco e garante o administrador inicial.
+[start]
+cmd = "npx prisma migrate deploy && npx prisma db seed && npx next start -H 0.0.0.0 -p ${PORT:-3000}"

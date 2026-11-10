@@ -47,6 +47,23 @@ sudo ufw allow from <IP-DO-ROTEADOR> to any port 2055 proto udp
 4. Aba *Domains*: adicione o domínio ao serviço `app`, porta `3000`, com HTTPS (Let's Encrypt).
 5. *Deploy*. A porta `2055/udp` do coletor é publicada direto no host; restrinja-a no firewall do servidor.
 
+#### Dokploy como *Application* (Nixpacks), com o coletor em outra máquina
+
+Alternativa ao Compose, quando o coletor roda separado (perto dos roteadores):
+
+1. Crie um **Database → MySQL** no Dokploy (guarde usuário, senha, nome do banco e o host interno).
+2. Crie um serviço **Application** com este repositório (branch `main`), *Build Type* **Nixpacks**
+   (o projeto fixa Node 22 em `.node-version`; o comando de início está em `nixpacks.toml` e aplica as migrações sozinho).
+3. Em *Environment* defina: `DATABASE_URL=mysql://USUARIO:SENHA@HOST-INTERNO:3306/BANCO`, `SESSION_SECRET`,
+   `ADMIN_EMAIL`, `ADMIN_PASSWORD`, e `SESSION_COOKIE_SECURE=true` (domínio com HTTPS, porta `3000`).
+4. Na máquina do coletor, suba só o pmacct apontando para esse MySQL (ele precisa estar acessível a essa máquina,
+   de preferência por VPN ou liberado só para o IP do coletor):
+
+```bash
+cp .env.collector.example .env       # SQL_HOST, SQL_PORT, SQL_USER, SQL_PASSWD
+docker compose -f docker-compose.collector.yml up -d
+```
+
 ### Atualizar
 
 ```bash

@@ -1,0 +1,25 @@
+# COLETOR SEPARADO: roda so o pmacct (nfacctd), perto dos roteadores, e grava
+# no MySQL do servidor do painel (ex.: Database MySQL do Dokploy).
+#
+#   cp .env.collector.example .env   # preencha SQL_*
+#   docker compose -f docker-compose.collector.yml up -d
+#
+# Os roteadores exportam NetStream/NetFlow para <IP desta maquina>:2055/udp.
+services:
+  nfacctd:
+    image: pmacct/nfacctd:latest
+    container_name: sosisp-nfacctd
+    restart: unless-stopped
+    environment:
+      SQL_HOST: ${SQL_HOST:?defina SQL_HOST}
+      SQL_PORT: ${SQL_PORT:-3306}
+      SQL_DB: ${SQL_DB:-sosisp}
+      SQL_USER: ${SQL_USER:?defina SQL_USER}
+      SQL_PASSWD: ${SQL_PASSWD:?defina SQL_PASSWD}
+    entrypoint: ["sh", "/entrypoint.sh"]
+    ports:
+      - "${NETFLOW_PORT:-2055}:2055/udp"
+    volumes:
+      - ./pmacct/entrypoint.sh:/entrypoint.sh:ro
+      - ./pmacct/nfacctd.conf:/etc/pmacct/nfacctd.conf:ro
+      - ./pmacct/sampling.map:/etc/pmacct/sampling.map:ro

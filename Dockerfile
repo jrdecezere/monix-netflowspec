@@ -16,6 +16,7 @@ FROM deps AS builder
 COPY . .
 # O build nao acessa o banco; estes valores so existem para os modulos carregarem.
 ENV NEXT_TELEMETRY_DISABLED=1 \
+    NEXT_STANDALONE=true \
     DATABASE_URL=mysql://build:build@localhost:3306/build \
     SESSION_SECRET=build-only
 RUN npx prisma generate && npm run build
