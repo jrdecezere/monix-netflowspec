@@ -89,8 +89,9 @@ model FlowDst {
   stampInserted DateTime  @map("stamp_inserted") @db.DateTime(0)
   stampUpdated  DateTime? @map("stamp_updated") @db.DateTime(0)
 
-  @@id([peerIpSrc, ifaceIn, ipDst, ipProto, tcpFlags, stampInserted])
-  @@index([stampInserted])
+  // O tempo vem PRIMEIRO na chave: ler "os últimos minutos" vira uma varredura
+  // sequencial da tabela (sem busca aleatória por linha). Era ~2000x mais lento.
+  @@id([stampInserted, peerIpSrc, ifaceIn, ipDst, ipProto, tcpFlags])
   @@index([ipDst, stampInserted])
   @@map("flow_dst")
 }
@@ -118,8 +119,7 @@ model FlowSrcPort {
   stampInserted DateTime  @map("stamp_inserted") @db.DateTime(0)
   stampUpdated  DateTime? @map("stamp_updated") @db.DateTime(0)
 
-  @@id([peerIpSrc, ifaceIn, ipProto, portSrc, stampInserted])
-  @@index([stampInserted])
+  @@id([stampInserted, peerIpSrc, ifaceIn, ipProto, portSrc])
   @@map("flow_src_port")
 }
 
