@@ -23,3 +23,12 @@ services:
       - ./pmacct/entrypoint.sh:/entrypoint.sh:ro
       - ./pmacct/nfacctd.conf:/etc/pmacct/nfacctd.conf:ro
       - ./pmacct/sampling.map:/etc/pmacct/sampling.map:ro
+    # Rede do Dokploy: e nela que o Database MySQL do Dokploy resolve pelo nome
+    # interno. O Dokploy so a anexa sozinho em servicos com dominio (o coletor nao tem).
+    networks:
+      - dokploy-network
+
+# Fora do Dokploy (sem MySQL do Dokploy), crie a rede uma vez: docker network create dokploy-network
+networks:
+  dokploy-network:
+    external: true
