@@ -14,7 +14,7 @@ export type Diagnostics = {
   timings: Timing[];
   facts: { label: string; value: string }[];
   perMinute: { stamp: string; rows: number }[];
-  running: { id: number; seconds: number; info: string }[];
+  running: { id: number; seconds: number; state: string; info: string }[];
 };
 
 const num = (v: unknown) => Number(v ?? 0);
@@ -57,6 +57,11 @@ export async function runDiagnostics(): Promise<Diagnostics> {
     () => prisma.$queryRaw<{ v: unknown }[]>`SELECT CAST(@@innodb_buffer_pool_size AS DOUBLE) AS v`,
     [{ v: 0 }],
   );
+  // 1 = grava em disco a cada instrução (seguro, lento em disco fraco); 2 = a cada ~1 s
+  const flush = await safe(
+    () => prisma.$queryRaw<{ v: unknown }[]>`SELECT CAST(@@innodb_flush_log_at_trx_commit AS DOUBLE) AS v`,
+    [{ v: -1 }],
+  );
   const pk = await safe(
     () =>
       prisma.$queryRaw<{ t: string; c: string }[]>`
@@ -87,8 +92,8 @@ export async function runDiagnostics(): Promise<Diagnostics> {
   );
   const running = await safe(
     () =>
-      prisma.$queryRaw<{ id: unknown; t: unknown; q: string | null }[]>`
-        SELECT CAST(ID AS DOUBLE) AS id, CAST(TIME AS DOUBLE) AS t, LEFT(INFO, 110) AS q
+      prisma.$queryRaw<{ id: unknown; t: unknown; st: string | null; q: string | null }[]>`
+        SELECT CAST(ID AS DOUBLE) AS id, CAST(TIME AS DOUBLE) AS t, STATE AS st, LEFT(INFO, 600) AS q
           FROM information_schema.PROCESSLIST
          WHERE COMMAND <> 'Sleep' AND ID <> CONNECTION_ID() AND INFO IS NOT NULL
          ORDER BY TIME DESC LIMIT 10`,
@@ -99,6 +104,7 @@ export async function runDiagnostics(): Promise<Diagnostics> {
   const facts = [
     { label: "MySQL", value: version?.v ?? "?" },
     { label: "Buffer pool do InnoDB", value: mb(pool?.v) },
+    { label: "innodb_flush_log_at_trx_commit", value: String(num(flush[0]?.v)) },
     ...pk.map((p) => ({
       label: `Chave primária de ${p.t} começa por`,
       value: p.c === "stamp_inserted" ? `${p.c} (correto)` : `${p.c} (ERRADO: migração não aplicada?)`,
@@ -113,6 +119,11 @@ export async function runDiagnostics(): Promise<Diagnostics> {
     timings,
     facts,
     perMinute: perMinute.map((m) => ({ stamp: m.s, rows: num(m.n) })),
-    running: running.map((r) => ({ id: num(r.id), seconds: num(r.t), info: r.q ?? "" })),
+    running: running.map((r) => ({
+      id: num(r.id),
+      seconds: num(r.t),
+      state: r.st ?? "",
+      info: r.q ?? "",
+    })),
   };
 }

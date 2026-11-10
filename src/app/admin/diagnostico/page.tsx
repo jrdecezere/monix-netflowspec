@@ -131,6 +131,7 @@ export default async function DiagnosticPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Há</TableHead>
+                    <TableHead>Estado</TableHead>
                     <TableHead>Consulta</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -138,7 +139,8 @@ export default async function DiagnosticPage() {
                   {d.running.map((r) => (
                     <TableRow key={r.id}>
                       <TableCell className="whitespace-nowrap font-mono">{r.seconds} s</TableCell>
-                      <TableCell className="font-mono text-xs">{r.info}</TableCell>
+                      <TableCell className="text-xs">{r.state || "—"}</TableCell>
+                      <TableCell className="break-all font-mono text-xs">{r.info}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
