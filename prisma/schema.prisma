@@ -96,25 +96,6 @@ model FlowDst {
 }
 
 /// Tráfego agregado por protocolo e porta de ORIGEM (assinaturas de amplificação).
-/// Fluxos "só SYN" (tcp_flags == 0x02), isolados pelo pre_tag_map do pmacct.
-/// Em `flow_dst` o tcp_flags é um OR acumulado do minuto (SYN+ACK mascara o SYN),
-/// então esta tabela é a fonte confiável para detectar SYN flood.
-model FlowSyn {
-  peerIpSrc     String    @map("peer_ip_src") @db.Char(45)
-  ifaceIn       Int       @map("iface_in") @db.UnsignedInt
-  ipDst         String    @map("ip_dst") @db.Char(45)
-  packets       Int       @db.UnsignedInt
-  bytes         BigInt    @db.UnsignedBigInt
-  flows         Int       @db.UnsignedInt
-  stampInserted DateTime  @map("stamp_inserted") @db.DateTime(0)
-  stampUpdated  DateTime? @map("stamp_updated") @db.DateTime(0)
-
-  @@id([peerIpSrc, ifaceIn, ipDst, stampInserted])
-  @@index([stampInserted])
-  @@index([ipDst, stampInserted])
-  @@map("flow_syn")
-}
-
 model FlowSrcPort {
   peerIpSrc     String    @map("peer_ip_src") @db.Char(45)
   ifaceIn       Int       @map("iface_in") @db.UnsignedInt

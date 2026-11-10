@@ -43,12 +43,15 @@ export function computeRates(w: Counters, windowSec: number): Rates {
   };
 }
 
-/** Quais limiares foram ultrapassados. SYN só conta se for maioria do TCP. */
+/** SYN-like: pacotes minúsculos (SYN tem 40-60 B) — o tcp_flags do pmacct é OR acumulado. */
+export const SYN_MAX_AVG_PACKET = 100;
+
+/** Quais limiares foram ultrapassados. SYN só conta se for maioria do TCP e de pacotes pequenos. */
 export function exceeded(r: Rates, l: Limits): ("bps" | "pps" | "synPps")[] {
   const out: ("bps" | "pps" | "synPps")[] = [];
   if (l.bps > 0 && r.bps >= l.bps) out.push("bps");
   if (l.pps > 0 && r.pps >= l.pps) out.push("pps");
-  if (l.synPps > 0 && r.synPps >= l.synPps && r.synShare >= 0.5) {
+  if (l.synPps > 0 && r.synPps >= l.synPps && r.synShare >= 0.5 && r.avgPacketBytes <= SYN_MAX_AVG_PACKET) {
     out.push("synPps");
   }
   return out;
@@ -134,7 +137,7 @@ export function classify(
   r: Rates,
   topSrcPort?: SrcPortHint | null,
 ): { type: AttackType; label: string; port?: number } {
-  if (r.synShare >= 0.5 && r.synPps >= 1000) {
+  if (r.synShare >= 0.5 && r.synPps >= 1000 && r.avgPacketBytes <= SYN_MAX_AVG_PACKET) {
     return { type: "SYN_FLOOD", label: ATTACK_LABEL.SYN_FLOOD };
   }
   if (r.udpShare >= 0.8) {

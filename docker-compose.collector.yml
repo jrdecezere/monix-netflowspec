@@ -23,7 +23,6 @@ services:
       - ./pmacct/entrypoint.sh:/entrypoint.sh:ro
       - ./pmacct/nfacctd.conf:/etc/pmacct/nfacctd.conf:ro
       - ./pmacct/sampling.map:/etc/pmacct/sampling.map:ro
-      - ./pmacct/pretag.map:/etc/pmacct/pretag.map:ro
     # Rede do Dokploy: e nela que o Database MySQL do Dokploy resolve pelo nome
     # interno. O Dokploy so a anexa sozinho em servicos com dominio (o coletor nao tem).
     networks:

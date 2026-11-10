@@ -212,7 +212,7 @@ export class DetectorEngine {
              CAST(SUM(flows) AS DOUBLE) AS flows,
              CAST(SUM(CASE WHEN ip_proto = 'udp' THEN bytes ELSE 0 END) AS DOUBLE) AS udp_bytes,
              CAST(SUM(CASE WHEN ip_proto = 'tcp' THEN packets ELSE 0 END) AS DOUBLE) AS tcp_packets,
-             CAST(SUM(CASE WHEN ip_proto = 'tcp' AND (tcp_flags & 2) > 0 AND (tcp_flags & 16) = 0
+             CAST(SUM(CASE WHEN ip_proto = 'tcp' AND (tcp_flags & 2) > 0
                            THEN packets ELSE 0 END) AS DOUBLE) AS syn_packets,
              CAST(SUM(CASE WHEN ip_proto = 'icmp' THEN packets ELSE 0 END) AS DOUBLE) AS icmp_packets
         FROM flow_dst

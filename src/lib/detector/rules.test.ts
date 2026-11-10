@@ -121,3 +121,12 @@ test("AlertBudget: respeita o teto e libera depois da janela", () => {
   assert.equal(b.take(120), false);
   assert.equal(b.take(161), true); // o de t=100 saiu da janela
 });
+
+test("SYN exige pacotes pequenos: tráfego TCP de dados grandes não vira SYN flood", () => {
+  const z = computeRates(ZERO, 60);
+  const big = { ...z, synShare: 0.95, synPps: 80_000, avgPacketBytes: 900 };
+  assert.deepEqual(exceeded(big, limits), []);
+  assert.notEqual(classify({ ...big, bps: 1e9 }).type, "SYN_FLOOD");
+  const small = { ...big, avgPacketBytes: 60 };
+  assert.deepEqual(exceeded(small, limits), ["synPps"]);
+});

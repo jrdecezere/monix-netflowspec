@@ -91,7 +91,8 @@ de destino e compara com os limiares:
 - **Evita falso positivo:** o evento só abre após N ciclos seguidos acima do limiar e só encerra após M ciclos abaixo de
   50% dele (histerese). SYN só conta se for a maioria do TCP.
 - **Classificação** pelo perfil do tráfego: SYN flood, amplificação UDP (NTP, DNS, Memcached…), UDP flood, ICMP flood ou
-  volumétrico. É heurística para orientar a análise, não prova.
+  volumétrico. É heurística para orientar a análise, não prova. O `tcp_flags` do pmacct é um OR acumulado no minuto
+  (ACK legítimo mascara o SYN), então "SYN flood" = TCP dominante com SYN visto **e** pacotes pequenos (≤ 100 B).
 - **Alertas** por Telegram (bot) e/ou webhook JSON, ao abrir e ao encerrar o ataque; botão "Enviar teste" na página.
 - Eventos em **Sistema → Ataques** (e aviso na tela de tráfego quando há ataque em andamento).
 
